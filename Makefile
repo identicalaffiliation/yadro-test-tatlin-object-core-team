@@ -15,3 +15,6 @@ build:
 
 run:
 	./$(BIN_NAME) -c=$(CONFIG_FILE)
+
+clean:
+	rm -rf $(BIN_NAME)
