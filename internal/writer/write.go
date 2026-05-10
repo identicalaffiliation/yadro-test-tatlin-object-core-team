@@ -9,14 +9,18 @@ import (
 	"path/filepath"
 )
 
-func (w *BucketWriter) writeBucket(_ context.Context, bucketIndex int, in <-chan string) {
+func (w *BucketWriter) WriteBucket(ctx context.Context, bucketIndex int, in <-chan string) {
 	file, err := os.Create(filepath.Join(w.dirPattern, fmt.Sprintf("bucket_%d.txt", bucketIndex)))
 	if err != nil {
 		log.Printf("create bucket file: %v\n", err)
 		return
 	}
 
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("close file: %v", err)
+		}
+	}()
 
 	writer := bufio.NewWriter(file)
 	linesBatch := make([]string, 0, w.batchSize)
@@ -26,11 +30,19 @@ func (w *BucketWriter) writeBucket(_ context.Context, bucketIndex int, in <-chan
 		_ = writer.Flush()
 	}()
 
-	for line := range in {
-		linesBatch = append(linesBatch, line)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case line, ok := <-in:
+			if !ok {
+				return
+			}
 
-		if len(linesBatch) >= w.batchSize {
-			linesBatch = flushLinesBatch(writer, linesBatch)
+			linesBatch = append(linesBatch, line)
+			if len(linesBatch) >= w.batchSize {
+				linesBatch = flushLinesBatch(writer, linesBatch)
+			}
 		}
 	}
 }

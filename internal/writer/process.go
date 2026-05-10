@@ -9,7 +9,7 @@ func (w *BucketWriter) Run(ctx context.Context, in <-chan string) error {
 	bucketChanns := w.initChanns()
 	wg := &sync.WaitGroup{}
 
-	w.startWriters(ctx, bucketChanns, wg)
+	w.StartWriters(ctx, bucketChanns, wg)
 
 	go func() {
 		defer func() {

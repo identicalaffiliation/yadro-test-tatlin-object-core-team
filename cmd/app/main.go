@@ -91,11 +91,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sum := 0
 	for key, value := range result {
-		sum += value
 		fmt.Printf("%s:%d\n", key, value)
 	}
-
-	fmt.Println(sum)
 }
