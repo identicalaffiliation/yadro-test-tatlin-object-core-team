@@ -37,7 +37,7 @@ func (w *BucketWriter) writeBucket(ctx context.Context, bucketIndex int, in <-ch
 			return
 		case line, ok := <-in:
 			if !ok {
-				flushLinesBatch(writer, linesBatch)
+				linesBatch = flushLinesBatch(writer, linesBatch)
 				return
 			}
 
