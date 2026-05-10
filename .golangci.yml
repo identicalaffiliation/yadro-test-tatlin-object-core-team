@@ -1,0 +1,22 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - govet
+    - ineffassign
+    - errcheck
+
+    - staticcheck
+    - unused
+
+    - bodyclose
+    - noctx
+
+    - prealloc
+formatters:
+  enable:
+    - gofmt
+    - goimports
