@@ -11,28 +11,34 @@ func (w *BucketWriter) Run(ctx context.Context, in <-chan string) error {
 
 	w.startWriters(ctx, bucketChanns, wg)
 
-	defer func() {
-		for _, ch := range bucketChanns {
-			close(ch)
+	go func() {
+		defer func() {
+			for _, ch := range bucketChanns {
+				close(ch)
+			}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case line, ok := <-in:
+				if !ok {
+					return
+				}
+
+				bucketIndex := int(w.hasher.HashLine32(line)) % w.bucketCount
+
+				select {
+				case bucketChanns[bucketIndex] <- line:
+				case <-ctx.Done():
+					return
+				}
+			}
 		}
-		wg.Wait()
 	}()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case line, ok := <-in:
-			if !ok {
-				return nil
-			}
-
-			bucketIndex := int(w.hasher.HashLine32(line)) % w.bucketCount
-			select {
-			case bucketChanns[bucketIndex] <- line:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-	}
+	wg.Wait()
+	return ctx.Err()
 }

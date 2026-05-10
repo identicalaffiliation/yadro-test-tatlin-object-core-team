@@ -11,6 +11,12 @@ import (
 
 	"github.com/identicalaffiliation/yadro-test-tatlin-object-core-team/internal/config"
 	"github.com/identicalaffiliation/yadro-test-tatlin-object-core-team/internal/reader"
+	"github.com/identicalaffiliation/yadro-test-tatlin-object-core-team/internal/reducer"
+	"github.com/identicalaffiliation/yadro-test-tatlin-object-core-team/internal/writer"
+)
+
+const (
+	TEMP_DIR_NAME = "./temp"
 )
 
 func main() {
@@ -33,20 +39,63 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !strings.HasSuffix(strings.TrimSpace(filename), ".txt") {
+	filename = strings.TrimSpace(filename)
+
+	if !strings.HasSuffix(filename, ".txt") {
 		log.Printf("file is not a txt format\n")
 		os.Exit(1)
 	}
 
-	out := make(chan string, cfg.ChannelBuff)
+	chann := make(chan string, cfg.ChannelBuff)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	fileReader := reader.NewFileReader(filename)
-	if err := fileReader.ParseFile(ctx, out); err != nil {
-		log.Printf("parse file: %v", err)
+	go func() {
+		fileReader := reader.NewFileReader(filename)
+		if err := fileReader.ParseFile(ctx, chann); err != nil {
+			log.Fatal(err)
+		}
+		close(chann)
+	}()
+
+	if err := os.MkdirAll(TEMP_DIR_NAME, 0755); err != nil {
+		log.Printf("create base temp dir: %v", err)
 		os.Exit(1)
 	}
 
+	tempDir, err := os.MkdirTemp(TEMP_DIR_NAME, "")
+	if err != nil {
+		log.Printf("make temp dir: %v", err)
+		os.Exit(1)
+	}
+
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			log.Printf("remove all files from temp dir: %v", err)
+		}
+
+		if err := os.Remove(TEMP_DIR_NAME); err != nil {
+			log.Printf("remove dir: %v", err)
+		}
+	}()
+
+	writer := writer.NewBucketWriter(cfg, tempDir)
+	if err := writer.Run(ctx, chann); err != nil {
+		log.Fatal(err)
+	}
+
+	reducer := reducer.NewReducer(tempDir)
+	result, err := reducer.GetInfos()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sum := 0
+	for key, value := range result {
+		sum += value
+		fmt.Printf("%s:%d\n", key, value)
+	}
+
+	fmt.Println(sum)
 }

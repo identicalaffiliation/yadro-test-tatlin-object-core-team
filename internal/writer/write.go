@@ -6,45 +6,31 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 )
 
-func (w *BucketWriter) writeBucket(ctx context.Context, bucketIndex int, in <-chan string) {
-	file, err := os.Create(fmt.Sprintf("./temp/bucket_%d.txt", bucketIndex))
+func (w *BucketWriter) writeBucket(_ context.Context, bucketIndex int, in <-chan string) {
+	file, err := os.Create(filepath.Join(w.dirPattern, fmt.Sprintf("bucket_%d.txt", bucketIndex)))
 	if err != nil {
 		log.Printf("create bucket file: %v\n", err)
 		return
 	}
 
-	defer func() {
-		if err := file.Close(); err != nil {
-			log.Printf("close file: %v\n", err)
-		}
-	}()
+	defer file.Close()
 
 	writer := bufio.NewWriter(file)
+	linesBatch := make([]string, 0, w.batchSize)
 
 	defer func() {
-		if err := writer.Flush(); err != nil {
-			log.Printf("flush writer: %v\n", err)
-		}
+		flushLinesBatch(writer, linesBatch)
+		_ = writer.Flush()
 	}()
 
-	linesBatch := make([]string, 0, w.batchSize)
-	for {
-		select {
-		case <-ctx.Done():
-			flushLinesBatch(writer, linesBatch)
-			return
-		case line, ok := <-in:
-			if !ok {
-				linesBatch = flushLinesBatch(writer, linesBatch)
-				return
-			}
+	for line := range in {
+		linesBatch = append(linesBatch, line)
 
-			linesBatch = append(linesBatch, line)
-			if len(linesBatch) >= w.batchSize {
-				linesBatch = flushLinesBatch(writer, linesBatch)
-			}
+		if len(linesBatch) >= w.batchSize {
+			linesBatch = flushLinesBatch(writer, linesBatch)
 		}
 	}
 }
@@ -60,8 +46,7 @@ func flushLinesBatch(w *bufio.Writer, batch []string) []string {
 
 func flush(w *bufio.Writer, batch []string) {
 	for _, line := range batch {
-		w.WriteString(line) //nolint: errcheck
-		w.WriteByte('\n')   //nolint: errcheck
+		_, _ = w.WriteString(line)
+		_ = w.WriteByte('\n')
 	}
-	w.Flush() //nolint: errcheck
 }

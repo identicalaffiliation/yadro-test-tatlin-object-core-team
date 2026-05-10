@@ -14,13 +14,15 @@ type BucketWriter struct {
 	bucketCount      int
 	batchSize        int
 	bucketChanBuffer int
+	dirPattern       string
 }
 
-func NewBucketWriter(cfg *config.CLIConfig) *BucketWriter {
+func NewBucketWriter(cfg *config.CLIConfig, dir string) *BucketWriter {
 	return &BucketWriter{
 		bucketCount:      cfg.BucketCount,
 		batchSize:        cfg.BatchSize,
 		bucketChanBuffer: cfg.ChannelBuff,
 		hasher:           hasher.NewHasher(),
+		dirPattern:       dir,
 	}
 }
